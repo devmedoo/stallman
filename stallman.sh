@@ -14,6 +14,18 @@ else
     exit 1
 fi
 
+prompt() {
+    message="The following packages are absolutely proprietary and must be purged immediately!"
+
+    if ( cowsay - &>/dev/null ) || [ -f rms.com ]; then 
+        cowsay -f ./rms.cow "$message"
+    else
+        echo -e "$message"
+    fi    
+
+    echo ""
+}
+
 case $distro in
     arch)
         temp_blacklist="/tmp/temp_blacklist.txt"
@@ -30,7 +42,8 @@ case $distro in
 
         comm --nocheck-order -1 -2 $pkg_del $installed_pkgs > $proprietary_pkgs
 
-        echo -e "The following packages are absolutely proprietary and must be purged immediately: \n"
+        #echo -e "The following packages are absolutely proprietary and must be purged immediately: \n"
+        prompt
         cat $proprietary_pkgs 
 
         # todo: prompt the user for confirmation then delete the packages
