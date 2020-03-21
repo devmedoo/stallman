@@ -1,7 +1,6 @@
 #!/bin/bash
 
 ## TODO:
-## - buffering then printing the whole frame instead of printing each line
 ## - mention why package is bloated
 ## - suggesting replacements for absolutely proprietary packages
 
@@ -33,16 +32,16 @@ selectedpkg=1
 frame=0
 render=1
 deletemsg=0
-
+buffer=""
 
 
 putspaces(){
-    for i in $(seq 1 17); do printf " "; done
+    for i in $(seq 1 17); do buffer="$buffer "; done
 }
 
 putlaserspaces(){
     spaces=$((21-$frame))
-    for i in $(seq 1 $spaces); do printf " "; done
+    for i in $(seq 1 $spaces); do buffer="$buffer "; done
 }
 
 deletepkg(){
@@ -53,15 +52,15 @@ deletepkg(){
 
 laserrms() {
     if (($frame == 0)); then
-        printf "     @@@ @($redØ$reset)|($redØ$reset)  @@ ";
+        buffer="\r\e[0K$buffer     @@@ @($redØ$reset)|($redØ$reset)  @@ ";
         ((frame++))
     elif (($frame < 21)); then
-        printf "     @@@ @($redØ$reset)|($redØ$reset)  @@ ";
-        for i in $(seq 1 $frame); do printf "$red+$reset"; done
+        buffer="\r\e[0K$buffer     @@@ @($redØ$reset)|($redØ$reset)  @@ ";
+        for i in $(seq 1 $frame); do buffer="$buffer$red+$reset"; done
         ((frame++))
     elif (($frame == 21 )); then
-        printf "     @@@ @($redØ$reset)|($redØ$reset)  @@ ";
-        for i in $(seq 1 20); do printf "$red+$reset"; done
+        buffer="\r\e[0K$buffer     @@@ @($redØ$reset)|($redØ$reset)  @@ ";
+        for i in $(seq 1 20); do buffer="$buffer$red+$reset"; done
         deletepkg
     fi
 }
@@ -71,20 +70,20 @@ putpackages() {
         putlaserspaces
         line=$(($outputpackages-4+$selectedpkg))
         pkg=$(tail -n+$line $proprietary_pkgs | head -n1)
-        printf "$pkg\n"
+        buffer="\r\e[0K$buffer$pkg                          \n"
     elif (($outputpackages > 4)); then
         putspaces
         line=$(($outputpackages-4+$selectedpkg))
         pkg=$(tail -n+$line $proprietary_pkgs | head -n1)
-        printf "$pkg\n"
+        buffer="\r\e[0K$buffer$pkg                          \n"
     else
-        printf "\n"
+        buffer="\r\e[0K$buffer\n"
     fi
-        
     ((outputpackages++))
 }
 
 angryrms() {
+    buffer="\r\e[0K"
     while IFS= read -r line ; do
         putspaces
         if [[ $line == "     @@@ @(0)|(0)  @@    " ]]; then
@@ -92,19 +91,20 @@ angryrms() {
             putpackages
             continue;
         fi
-        printf "$line"; 
+        buffer="\r\e[0K$buffer$line"; 
         putpackages
     done <<< "$rms"
+    echo -e "$buffer"
 }
 
 prompt() {
     message="The following packages are absolutely proprietary and must be purged immediately!"
-    clear
+    tput cuu 44 && tput el && tput rc
     echo -e "$message"
     angryrms
     printf "$tailmsg"
     if [ $deletemsg -eq 1 ]; then
-        printf "Delete bloated package $selectedpkgname ? [y/N]: "
+        printf "Delete bloated package $selectedpkgname ? [y/N]:                              "
         read -n1 rmrfroot
          if [ "$rmrfroot" != "${rmrfroot#[Yy]}" ] ;then
             case $distro in
@@ -121,6 +121,8 @@ prompt() {
         frame=0
         deletemsg=0
         render=1
+    else
+        printf "                                                           "
     fi
 }
 
@@ -129,7 +131,7 @@ renderprompt() {
         tput civis      -- invisible
         outputpackages=0
         prompt
-        sleep 0.08
+        sleep 0.00001
     else
         tput cnorm   -- normal
     fi
@@ -157,11 +159,6 @@ get_package_blacklist() {
             #echo -e "The following packages are absolutely proprietary and must be purged immediately: \n"
             renderprompt
 
-            # todo: prompt the user for confirmation then delete the packages
-            #       replace the deleted packages with free alternatives if available
-            #
-            # double check the blacklist bec some essential packages are reported as
-            # proprietary such as pacman and base`;w
             ;;
         *)
             echo "Your distro is yet to be supported"
@@ -171,6 +168,7 @@ get_package_blacklist() {
 
 
 main() {
+    tput sc
     if [ -f /etc/os-release ]; then
         if ( grep "ID_LIKE" /etc/os-release >/dev/null ); then
             distro="$(grep "^ID_LIKE" /etc/os-release | cut -c 9-)"
