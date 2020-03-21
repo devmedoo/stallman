@@ -1,7 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 
 ## TODO:
 ## - buffering then printing the whole frame instead of printing each line
+## - mention why package is bloated
+## - suggesting replacements for absolutely proprietary packages
 
 # RMS FACE #
 
@@ -27,8 +29,12 @@ rms="         @@@@@@ @
 red="\e[38;5;124m" # OUR RED COLOR CODE
 reset="\e[0m" # NORMAL COLOR CODE
 
-selectedpkg=0
+selectedpkg=1
 frame=0
+render=1
+deletemsg=0
+
+
 
 putspaces(){
     for i in $(seq 1 17); do printf " "; done
@@ -40,9 +46,9 @@ putlaserspaces(){
 }
 
 deletepkg(){
-    frame=0
-    # TODO ? DEL PKG?!
-    ((selectedpkg++))
+    render=0
+    selectedpkgname=$(tail -n+$selectedpkg $proprietary_pkgs | head -n1)
+    deletemsg=1
 }
 
 laserrms() {
@@ -63,12 +69,12 @@ laserrms() {
 putpackages() {
     if (($outputpackages == 4)); then
         putlaserspaces
-        line=$(($outputpackages+$selectedpkg))
+        line=$(($outputpackages-4+$selectedpkg))
         pkg=$(tail -n+$line $proprietary_pkgs | head -n1)
         printf "$pkg\n"
     elif (($outputpackages > 4)); then
         putspaces
-        line=$(($outputpackages+$selectedpkg))
+        line=$(($outputpackages-4+$selectedpkg))
         pkg=$(tail -n+$line $proprietary_pkgs | head -n1)
         printf "$pkg\n"
     else
@@ -96,16 +102,39 @@ prompt() {
     clear
     echo -e "$message"
     angryrms
+    printf "$tailmsg"
+    if [ $deletemsg -eq 1 ]; then
+        printf "Delete bloated package $selectedpkgname ? [y/N]: "
+        read -n1 rmrfroot
+         if [ "$rmrfroot" != "${rmrfroot#[Yy]}" ] ;then
+            case $distro in
+                arch)
+                    echo ""
+                    sudo pacman -Rs $selectedpkgname
+                    ;;
+                *)
+                    echo -n "How the hell did you get here?" # unsupported distro, how the hell did they pass the first check in get_package_blacklist
+                    ;;
+            esac
+        fi
+        ((selectedpkg++))
+        frame=0
+        deletemsg=0
+        render=1
+    fi
 }
 
 renderprompt() {
-    tput civis      -- invisible
-    while true; do
+    if [ $render -eq 1 ]; then
+        tput civis      -- invisible
         outputpackages=0
         prompt
         sleep 0.08
-    done
-    tput cnorm   -- normal
+    else
+        tput cnorm   -- normal
+    fi
+    
+    renderprompt
 }
 
 get_package_blacklist() {
@@ -148,11 +177,11 @@ main() {
         elif ( grep "ID" /etc/os-release >/dev/null ); then
             distro="$(grep "^ID" /etc/os-release | cut -c 4-)"
         else
-            echo "Your distro is not supported"
+            echo "Your operating system is not supported"
             exit 1
         fi
     else
-        echo "Your distro is not supported"
+        echo "Your operating system is not supported"
         exit 1
     fi
 
