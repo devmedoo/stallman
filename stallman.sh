@@ -151,12 +151,11 @@ get_package_blacklist() {
 
             curl -s https://git.parabola.nu/blacklist.git/plain/blacklist.txt > $temp_blacklist
 
-            sed -i '/branding/ d' $temp_blacklist
+            sed -i -E '/branding|^base|^pacman/ d' $temp_blacklist
             egrep -o '^[a-z,A-Z,0-9,-]+' $temp_blacklist > $pkg_del
 
             comm --nocheck-order -1 -2 $pkg_del $installed_pkgs > $proprietary_pkgs
 
-            #echo -e "The following packages are absolutely proprietary and must be purged immediately: \n"
             renderprompt
 
             ;;
